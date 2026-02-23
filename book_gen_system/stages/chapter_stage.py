@@ -11,7 +11,7 @@ class ChapterStage:
         self.notifier = notifier
         self.research = ResearchManager()
 
-    def generate_next_chapter(self, book_id: str, chapter_num: int, title: str, chapter_title: str, status: str, notes: str = ""):
+    def generate_next_chapter(self, book_id: str, chapter_num: int, title: str, chapter_title: str, status: str, notes: str = "", pre_generated_id: str = None):
         """
         Logic:
         Use summary of all previous chapters as context.
@@ -46,7 +46,7 @@ class ChapterStage:
         summary_prompt = self.llm.get_summary_prompt(content)
         summary = self.llm.generate_content(summary_prompt)
         
-        chapter_id = str(uuid.uuid4())
+        chapter_id = pre_generated_id or str(uuid.uuid4())
         self.db.save_chapter(chapter_id, book_id, chapter_num, chapter_title, content, summary)
         
         print(f"Chapter {chapter_num} ('{chapter_title}') generated and summarized.")
