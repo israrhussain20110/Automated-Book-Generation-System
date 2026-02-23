@@ -1,0 +1,36 @@
+# Environments
+.env
+.venv/
+venv/
+env/
+tests/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Databases
+*.db
+*.sqlite3
+
+# Node / JS
+node_modules/
+dist/
+build/
+.npm/
+
+# App Outputs
+outputs/
+*.docx
+*.pdf
+
+# Logs
+*.log
+uvicorn.log
+
+# OS
+.DS_Store

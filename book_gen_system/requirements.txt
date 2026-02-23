@@ -1,0 +1,10 @@
+supabase
+python-docx
+google-generativeai
+pandas
+openpyxl
+fpdf2
+requests
+python-dotenv
+duckduckgo-search
+openai
