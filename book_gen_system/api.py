@@ -189,14 +189,31 @@ async def update_outline(book_id: str, update: OutlineUpdate):
 
 @app.post("/books/{book_id}/chapters")
 async def generate_chapter(book_id: str, chapter_data: ChapterGenerate, background_tasks: BackgroundTasks):
-    res = chapter_stage.generate_next_chapter(book_id, chapter_data.chapter_num, chapter_data.title, chapter_data.chapter_title, chapter_data.status, chapter_data.notes)
-    if res is None:
-        if chapter_data.status == "no" or not chapter_data.status:
-            return {"message": f"Chapter {chapter_data.chapter_num} generation paused.", "chapter_id": None}
-        if chapter_data.status == "yes" and not chapter_data.notes:
-             return {"message": f"Waiting for notes for Chapter {chapter_data.chapter_num}.", "chapter_id": None}
-        raise HTTPException(status_code=400, detail="Failed to generate chapter.")
-    return {"chapter_id": res}
+    # Determine the status and whether we actually need to pause or proceed
+    if chapter_data.status == "no" or not chapter_data.status:
+        notifier.notify_pause_or_error(f"Book ID {book_id}", f"User requested pause on chapter {chapter_data.chapter_num} generation")
+        return {"message": f"Chapter {chapter_data.chapter_num} generation paused.", "chapter_id": None}
+        
+    if chapter_data.status == "yes" and not chapter_data.notes:
+        notifier.waiting_for_notes(chapter_data.chapter_num)
+        return {"message": f"Waiting for notes for Chapter {chapter_data.chapter_num}.", "chapter_id": None}
+        
+    # We generate a UUID for the chapter immediately to return it to the frontend
+    chapter_id = str(uuid.uuid4())
+    
+    # We pass the pre-generated chapter_id to allow the background task to save it
+    background_tasks.add_task(
+        chapter_stage.generate_next_chapter, 
+        book_id=book_id, 
+        chapter_num=chapter_data.chapter_num, 
+        title=chapter_data.title, 
+        chapter_title=chapter_data.chapter_title, 
+        status=chapter_data.status, 
+        notes=chapter_data.notes,
+        pre_generated_id=chapter_id # New argument we'll add
+    )
+    
+    return {"message": f"Chapter generation for '{chapter_data.chapter_title}' started in background.", "chapter_id": chapter_id}
 
 @app.get("/books/{book_id}/chapters")
 async def list_chapters(book_id: str):

@@ -39,7 +39,7 @@ class LLMManager:
         else:
             return "This is mock chapter content generated for demonstration purposes."
 
-    def generate_content(self, prompt: str) -> str:
+    async def generate_content(self, prompt: str) -> str:
         if self.provider == "deepseek":
             if not self.client:
                 return self._mock_generate(prompt)
