@@ -1,6 +1,6 @@
-
 import sqlite3
 import os
+import uuid
 from typing import List, Dict, Any, Optional
 
 class DBManager:
@@ -26,7 +26,9 @@ class DBManager:
                 title TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status_outline_notes TEXT DEFAULT 'pending_review',
-                book_output_status TEXT DEFAULT 'drafting'
+                book_output_status TEXT DEFAULT 'drafting',
+                final_review_notes_status TEXT DEFAULT 'pending_review',
+                final_review_notes TEXT
             );
             CREATE TABLE IF NOT EXISTS outlines (
                 id TEXT PRIMARY KEY,
@@ -124,6 +126,26 @@ class DBManager:
                 "chapter_notes_status": "pending_review"
             }).execute()
 
+    def insert_stub_chapter(self, book_id: str, chapter_number: int, title: str):
+        chapter_id = str(uuid.uuid4())
+        if self.db_type == "sqlite":
+            self.cursor.execute(
+                "INSERT INTO chapters (id, book_id, chapter_number, title, content, summary, notes, chapter_notes_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (chapter_id, book_id, chapter_number, title, "", "", "", "generating")
+            )
+            self.conn.commit()
+        else:
+            self.supabase.table("chapters").insert({
+                "id": chapter_id,
+                "book_id": book_id,
+                "chapter_number": chapter_number,
+                "title": title,
+                "content": "",
+                "summary": "",
+                "status": "generating"
+            }).execute()
+        return chapter_id
+
     def get_chapter_summaries(self, book_id: str) -> List[str]:
         if self.db_type == "sqlite":
             self.cursor.execute("SELECT summary FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC", (book_id,))
@@ -134,28 +156,28 @@ class DBManager:
     
     def get_all_chapters(self, book_id: str) -> List[Dict[str, Any]]:
         if self.db_type == "sqlite":
-            self.cursor.execute("SELECT chapter_number, title, content FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC", (book_id,))
-            return [{"chapter_number": r[0], "title": r[1], "content": r[2]} for r in self.cursor.fetchall()]
+            self.cursor.execute("SELECT chapter_number, title, content, chapter_notes_status, summary FROM chapters WHERE book_id = ? ORDER BY chapter_number ASC", (book_id,))
+            return [{"chapter_number": r[0], "title": r[1], "content": r[2], "chapter_notes_status": r[3], "summary": r[4]} for r in self.cursor.fetchall()]
         else:
             res = self.supabase.table("chapters").select("*").eq("book_id", book_id).order("chapter_number").execute()
             return [{
                 "chapter_number": r.get("chapter_number"),
                 "title": r.get("chapter_title"),
-                "content": r.get("chapter_content")
+                "content": r.get("chapter_content"),
+                "chapter_notes_status": r.get("chapter_notes_status"),
+                "summary": r.get("chapter_summary")
             } for r in res.data]
 
     def get_outline(self, book_id: str) -> Optional[Dict[str, Any]]:
         if self.db_type == "sqlite":
-            # Join with books to get status_outline_notes
             self.cursor.execute("""
-                SELECT o.id, o.content, b.status_outline_notes 
-                FROM outlines o 
-                JOIN books b ON o.book_id = b.id 
+                SELECT o.id, o.content, o.status, o.notes_before
+                FROM outlines o
                 WHERE o.book_id = ?
             """, (book_id,))
             row = self.cursor.fetchone()
             if row:
-                return {"id": row[0], "content": row[1], "status": row[2]}
+                return {"id": row[0], "content": row[1], "status": row[2], "notes_before": row[3]}
             return None
         else:
             res = self.supabase.table("books").select("id, outline, status_outline_notes").eq("id", book_id).execute()
@@ -165,3 +187,36 @@ class DBManager:
                 content = json.dumps(row.get("outline")) if isinstance(row.get("outline"), dict) else row.get("outline")
                 return {"id": row["id"], "content": content, "status": row.get("status_outline_notes")}
             return None
+
+    def update_final_review_status(self, book_id: str, status: str, notes: str = None):
+        if self.db_type == "sqlite":
+            self.cursor.execute(
+                "UPDATE books SET final_review_notes_status = ?, final_review_notes = ? WHERE id = ?",
+                (status, notes, book_id)
+            )
+            self.conn.commit()
+        else:
+            self.supabase.table("books").update({
+                "final_review_notes_status": status,
+                "final_review_notes": notes
+            }).eq("id", book_id).execute()
+
+    def get_book_details(self, book_id: str) -> Optional[Dict[str, Any]]:
+        if self.db_type == "sqlite":
+            self.cursor.execute("SELECT id, title, final_review_notes_status, final_review_notes, book_output_status FROM books WHERE id = ?", (book_id,))
+            row = self.cursor.fetchone()
+            if row:
+                return {
+                    "id": row[0],
+                    "title": row[1],
+                    "final_review_notes_status": row[2],
+                    "final_review_notes": row[3],
+                    "book_output_status": row[4]
+                }
+            return None
+        else:
+            res = self.supabase.table("books").select("*").eq("id", book_id).execute()
+            if res.data:
+                return res.data[0]
+            return None
+

@@ -30,6 +30,8 @@ class ChapterStage:
                 self.notifier.notify_pause_or_error(title, f"User requested pause on chapter {chapter_num} generation")
             return None
 
+        # Pre-insert stub to DB so frontend sees it as generating immediately
+        chapter_id = pre_generated_id or self.db.insert_stub_chapter(book_id, chapter_num, chapter_title)
 
         # Aggregated research context
         research_context = self.research.get_research_context(title)
@@ -38,16 +40,20 @@ class ChapterStage:
         # Aggregate context
         prev_summaries = self.db.get_chapter_summaries(book_id)
         
-        prompt = self.llm.get_chapter_prompt(title, chapter_title, prev_summaries, combined_notes)
+        # Single LLM call: generate chapter content (skip slow web research)
+        prompt = self.llm.get_chapter_prompt(title, chapter_title, prev_summaries, notes)
         content = self.llm.generate_content(prompt)
-        
 
-        # Generate summary for context chaining
-        summary_prompt = self.llm.get_summary_prompt(content)
-        summary = self.llm.generate_content(summary_prompt)
+        # Quick inline summary (single sentence, no separate LLM call)
+        summary = content[:200] if len(content) > 200 else content
         
-        chapter_id = pre_generated_id or str(uuid.uuid4())
+        # Save replaces or updates the stub
         self.db.save_chapter(chapter_id, book_id, chapter_num, chapter_title, content, summary)
+        if self.db.db_type == "sqlite":
+            self.db.cursor.execute("UPDATE chapters SET chapter_notes_status = 'pending_review' WHERE id = ?", (chapter_id,))
+            self.db.conn.commit()
+        else:
+            self.db.supabase.table("chapters").update({"status": "pending_review"}).eq("id", chapter_id).execute()
         
         print(f"Chapter {chapter_num} ('{chapter_title}') generated and summarized.")
         return chapter_id

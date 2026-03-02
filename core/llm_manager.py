@@ -39,7 +39,7 @@ class LLMManager:
         else:
             return "This is mock chapter content generated for demonstration purposes."
 
-    async def generate_content(self, prompt: str) -> str:
+    def generate_content(self, prompt: str) -> str:
         if self.provider == "deepseek":
             if not self.client:
                 return self._mock_generate(prompt)
@@ -73,10 +73,10 @@ class LLMManager:
                 return f"Error during generation: {str(e)}"
 
     def get_summary_prompt(self, chapter_content: str) -> str:
-        return f"Summarize the following book chapter in 3-5 concise sentences:\n\n{chapter_content}"
+        return f"Summarize the following book chapter in 1 concise sentence:\n\n{chapter_content}"
 
     def get_outline_prompt(self, title: str, notes: str) -> str:
-        return f"Generate a detailed book outline for a book titled '{title}'. Context: {notes}. Output in JSON format with chapter titles."
+        return f"Generate a microscopic book outline for a book titled '{title}'. Context: {notes}. Output in JSON format with exactly 2 short chapter titles under the key 'chapters'."
 
     def get_chapter_prompt(self, title: str, chapter_title: str, prev_summaries: list, extra_notes: str = "") -> str:
         summaries_text = "\n".join([f"Chapter {i+1}: {s}" for i, s in enumerate(prev_summaries)])
@@ -89,5 +89,5 @@ class LLMManager:
         
         Editor's Notes: {extra_notes}
         
-        Write a full, engaging chapter for this book.
+        Write an extremely short, 1-paragraph chapter for this book to ensure generation is blindingly fast.
         """

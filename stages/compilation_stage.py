@@ -34,14 +34,18 @@ class CompilationStage:
             doc.add_page_break()
         
         filename = f"{title.replace(' ', '_')}.docx"
-        out_path = os.path.join(os.path.dirname(__file__), "..", "outputs", filename)
+        out_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, filename)
         doc.save(out_path)
         print(f"Book compiled to {out_path}")
         return out_path
 
     def _to_txt(self, title, chapters):
         filename = f"{title.replace(' ', '_')}.txt"
-        out_path = os.path.join(os.path.dirname(__file__), "..", "outputs", filename)
+        out_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, filename)
         with open(out_path, "w") as f:
             f.write(f"{title}\n\n")
             for ch in chapters:

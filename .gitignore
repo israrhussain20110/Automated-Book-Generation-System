@@ -4,7 +4,7 @@
 venv/
 env/
 tests/
-
+.vscode/
 
 # Python
 __pycache__/
